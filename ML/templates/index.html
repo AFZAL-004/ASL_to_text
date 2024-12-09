@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Language Recognition</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- Include jQuery -->
+    <style>
+            /* Global Styles */
+    body {
+        font-family: 'Arial', sans-serif;
+        background-color: #f9f9f9; /* Lighter background for a softer feel */
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        flex-direction: column;
+        color: #333;
+    }
+
+    h1 {
+        font-size: 2.5rem;
+        color: #333;
+        margin-bottom: 20px;
+        text-align: center;
+        font-weight: 600;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1); /* Soft shadow for depth */
+    }
+
+    h2 {
+        font-size: 1.25rem;
+        color: #555; /* Slightly lighter color for h2 */
+        margin-top: 20px;
+        text-align: center;
+    }
+
+    /* Button Styling */
+    button {
+        background-color: #4CAF50; /* Green for primary action */
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        font-size: 1rem;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-bottom: 20px;
+        transition: background-color 0.3s ease, transform 0.3s ease; /* Added scale effect */
+    }
+
+    button:hover {
+        background-color: #45a049; /* Slightly darker green on hover */
+        transform: scale(1.05); /* Subtle scaling effect */
+    }
+
+    /* Camera Section */
+    #live-camera {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 20px;
+        background-color: #fff; /* White background for the camera container */
+        padding: 20px;
+        border-radius: 10px; /* Rounded corners */
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+    }
+
+    #video-stream {
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border: 2px solid #4CAF50; /* Green border for video stream */
+    }
+
+    #camera-image {
+        margin-top: 10px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Uploaded Image Section */
+    #upload-image {
+        margin: 10px 0;
+        padding: 5px;
+        border-radius: 5px;
+        font-size: 1rem;
+        border: 1px solid #ddd; /* Light gray border */
+        background-color: #f8f8f8; /* Light background for the file input */
+    }
+
+    #upload-image:focus {
+        border-color: #4CAF50; /* Highlight border on focus */
+        outline: none; /* Remove outline on focus */
+    }
+
+    #uploaded-image {
+        margin-top: 10px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Prediction Section */
+    #prediction {
+        font-size: 1.5rem;
+        color: #4CAF50; /* Green for success messages */
+        font-weight: 600;
+        margin-top: 20px;
+        text-align: center;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.1); /* Soft shadow for depth */
+    }
+
+    /* Loading Indicator */
+    #loading {
+        font-size: 1.2rem;
+        color: #888; /* Light gray color for loading text */
+        font-weight: 500;
+        margin-top: 10px;
+        display: none;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        #video-stream, #camera-image, #uploaded-image {
+            width: 100%;
+            max-width: 300px;
+        }
+
+        button {
+            font-size: 1.1rem;
+            padding: 12px 24px;
+        }
+
+        h1 {
+            font-size: 2rem;
+        }
+
+        #live-camera {
+            padding: 15px; /* Adjust padding for smaller screens */
+        }
+    }
+
+    @media (max-width: 480px) {
+        h1 {
+            font-size: 1.75rem;
+        }
+
+        button {
+            font-size: 1rem;
+            padding: 10px 20px;
+        }
+
+        #live-camera {
+            flex-direction: column; /* Stack the camera elements on smaller screens */
+        }
+    }
+
+    </style>
+</head>
+<body>
+    <h1>Sign Language Recognition</h1>
+
+    <!-- Live Camera -->
+    <button id="capture-btn">Capture from Camera</button>
+    <div id="live-camera">
+        <video id="video-stream" width="300" height="300" autoplay></video>
+        <img id="camera-image" src="" alt="Captured Image" style="display: none; width: 300px;">
+    </div>
+
+    <!-- Uploaded Image -->
+    <input type="file" id="upload-image" accept="image/*">
+    <img id="uploaded-image" src="" alt="Uploaded Image" style="display: none; width: 300px;">
+
+    <!-- Display Prediction -->
+    <h2 id="prediction"></h2>
+
+    <script>
+        const captureBtn = document.getElementById('capture-btn');
+        const videoStream = document.getElementById('video-stream');
+        const cameraImage = document.getElementById('camera-image');
+        const uploadInput = document.getElementById('upload-image');
+        const uploadedImage = document.getElementById('uploaded-image');
+        const predictionText = document.getElementById('prediction');
+        let mediaStream;
+
+        // Function to start the camera stream
+        function startCamera() {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(stream => {
+                    mediaStream = stream;
+                    videoStream.srcObject = stream;
+                })
+                .catch(err => {
+                    console.error("Error accessing camera: ", err);
+                    predictionText.textContent = "Error accessing camera.";
+                });
+        }
+
+        // Function to stop the camera stream
+        function stopCamera() {
+            if (mediaStream) {
+                const tracks = mediaStream.getTracks();
+                tracks.forEach(track => track.stop());
+            }
+        }
+
+        // Start the camera when the page loads
+        startCamera();
+
+        // Capture image from live camera
+        captureBtn.addEventListener('click', () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = videoStream.videoWidth;
+            canvas.height = videoStream.videoHeight;
+            ctx.drawImage(videoStream, 0, 0, canvas.width, canvas.height);
+
+            // Convert captured image to Blob and send it as a file
+            canvas.toBlob(function(blob) {
+                const formData = new FormData();
+                formData.append('file', blob, 'captured-image.png'); // Use a unique name for each capture
+
+                // Send the captured image to Flask for prediction
+                sendImageToBackend(formData);
+
+                // Display the captured image
+                const imageUrl = URL.createObjectURL(blob);
+                cameraImage.src = imageUrl;
+                cameraImage.style.display = 'block';
+                stopCamera();  // Stop the camera after capturing the image
+            }, 'image/png');
+        });
+
+        // Upload image and predict
+        uploadInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Send the uploaded image to Flask for prediction
+            sendImageToBackend(formData);
+
+            // Display uploaded image
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadedImage.src = e.target.result;
+                uploadedImage.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Send image data to backend for prediction
+        function sendImageToBackend(formData) {
+            // Use jQuery's AJAX for sending image form data
+            $.ajax({
+                url: '/predict',        // Flask endpoint
+                method: 'POST',         // POST method
+                data: formData,         // Send image form data
+                processData: false,     // Don't process the data (important for FormData)
+                contentType: false,     // Let the browser set the content type
+                success: function(data) {
+                    if (data.predicted_class) {
+                        predictionText.innerText = "Predicted Class: " + data.predicted_class;
+                    } else {
+                        predictionText.textContent = 'Prediction: No result found';
+                    }
+                },
+                error: function(xhr, status, error) {
+                    predictionText.textContent = 'Error: Unable to make a prediction';
+                    console.error('Error:', error);
+                }
+            });
+        }
+
+        // Function to load the prediction on page load (if needed)
+        window.onload = function() {
+            const predictionText = document.getElementById('prediction');
+            predictionText.textContent = 'Loading prediction...';  // Initial text or message
+        };
+    </script>
+</body>
+</html>
